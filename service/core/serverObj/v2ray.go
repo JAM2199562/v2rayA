@@ -48,6 +48,7 @@ type V2Ray struct {
 	ShortId       string `json:"sid,omitempty"`
 	SpiderX       string `json:"spx,omitempty"`
 	Flow          string `json:"flow,omitempty"`
+	Encryption    string `json:"encryption,omitempty"`
 	Alpn          string `json:"alpn,omitempty"`
 	AllowInsecure bool   `json:"allowInsecure"`
 	Key           string `json:"key,omitempty"`
@@ -88,6 +89,7 @@ func ParseVlessURL(vless string) (data *V2Ray, err error) {
 		ShortId:       u.Query().Get("sid"),
 		SpiderX:       u.Query().Get("spx"),
 		Flow:          u.Query().Get("flow"),
+		Encryption:    u.Query().Get("encryption"),
 		Alpn:          u.Query().Get("alpn"),
 		AllowInsecure: u.Query().Get("allowInsecure") == "true",
 		Key:           u.Query().Get("key"),
@@ -258,9 +260,9 @@ func (v *V2Ray) Configuration(info PriorInfo) (c Configuration, err error) {
 				},
 			}
 		case "vless":
-			security := v.Security
-			if security == "" {
-				security = "auto"
+			encryption := v.Encryption
+			if encryption == "" {
+				encryption = "none"
 			}
 			core.Settings.Vnext = []coreObj.Vnext{
 				{
@@ -269,7 +271,7 @@ func (v *V2Ray) Configuration(info PriorInfo) (c Configuration, err error) {
 					Users: []coreObj.User{
 						{
 							ID:         id,
-							Encryption: "none",
+							Encryption: encryption,
 						},
 					},
 				},
