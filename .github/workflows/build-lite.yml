@@ -1,4 +1,4 @@
-name: Build v2rayA (Linux + macOS)
+name: Build & Push Docker Image
 
 on:
   push:
@@ -6,12 +6,14 @@ on:
     paths:
       - "service/**"
       - "gui/**"
+      - "install/docker/**"
       - ".github/workflows/**"
   pull_request:
     branches: [main]
     paths:
       - "service/**"
       - "gui/**"
+      - "install/docker/**"
       - ".github/workflows/**"
   workflow_dispatch:
 
@@ -39,21 +41,10 @@ jobs:
           name: web
           path: web/
 
-  build_binaries:
+  docker_push:
     runs-on: ubuntu-latest
     needs: [build_web]
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - goos: linux
-            goarch: amd64
-          - goos: linux
-            goarch: arm64
-          - goos: darwin
-            goarch: amd64
-          - goos: darwin
-            goarch: arm64
+    if: github.event_name != 'pull_request'
     steps:
       - uses: actions/checkout@v6
 
@@ -63,30 +54,33 @@ jobs:
           name: web
           path: service/server/router/web
 
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.24"
-          cache-dependency-path: |
-            service/go.mod
-            service/go.sum
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
-      - name: Build binary
-        env:
-          CGO_ENABLED: 0
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Prepare image tags
+        id: meta
         run: |
-          mkdir -p dist
-          VERSION=$(git describe --tags --always)
-          cd service
-          go build -tags "with_gvisor" \
-            -trimpath \
-            -ldflags "-X github.com/v2rayA/v2rayA/conf.Version=${VERSION#v} -s -w" \
-            -o "../dist/v2raya_${GOOS}_${GOARCH}_${VERSION}" .
+          REPO="${{ secrets.DOCKER_USERNAME }}/v2raya"
+          SHORT_SHA="${GITHUB_SHA::7}"
+          echo "repo=$REPO" >> $GITHUB_OUTPUT
+          echo "sha_tag=sha-${SHORT_SHA}" >> $GITHUB_OUTPUT
 
-      - name: Upload binary artifact
-        uses: actions/upload-artifact@v4
+      - name: Build and push
+        uses: docker/build-push-action@v5
         with:
-          name: v2raya_${{ matrix.goos }}_${{ matrix.goarch }}
-          path: dist/v2raya_${{ matrix.goos }}_${{ matrix.goarch }}_*
+          context: .
+          file: install/docker/Dockerfile.Action
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ steps.meta.outputs.repo }}:latest
+            ${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.sha_tag }}
