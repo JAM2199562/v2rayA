@@ -22,6 +22,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -47,6 +49,8 @@ jobs:
     if: github.event_name != 'pull_request'
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - name: Download web artifact
         uses: actions/download-artifact@v4
@@ -71,8 +75,10 @@ jobs:
         run: |
           REPO="${{ secrets.DOCKER_USERNAME }}/v2raya"
           SHORT_SHA="${GITHUB_SHA::7}"
+          VERSION="$(git describe --abbrev=0 --tags | sed 's/^v//')"
           echo "repo=$REPO" >> $GITHUB_OUTPUT
           echo "sha_tag=sha-${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "version_tag=v${VERSION}-enc" >> $GITHUB_OUTPUT
 
       - name: Build and push
         uses: docker/build-push-action@v5
@@ -83,4 +89,5 @@ jobs:
           push: true
           tags: |
             ${{ steps.meta.outputs.repo }}:latest
+            ${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.version_tag }}
             ${{ steps.meta.outputs.repo }}:${{ steps.meta.outputs.sha_tag }}
