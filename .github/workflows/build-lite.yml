@@ -1,0 +1,92 @@
+name: Build v2rayA (Linux + macOS)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "service/**"
+      - "gui/**"
+      - ".github/workflows/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "service/**"
+      - "gui/**"
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+jobs:
+  build_web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "yarn"
+          cache-dependency-path: gui/yarn.lock
+
+      - name: Build GUI assets
+        run: |
+          yarn --cwd gui --check-files
+          yarn --cwd gui build
+
+      - name: Upload web artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web
+          path: web/
+
+  build_binaries:
+    runs-on: ubuntu-latest
+    needs: [build_web]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+          - goos: linux
+            goarch: arm64
+          - goos: darwin
+            goarch: amd64
+          - goos: darwin
+            goarch: arm64
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Download web artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: web
+          path: service/server/router/web
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+          cache-dependency-path: |
+            service/go.mod
+            service/go.sum
+
+      - name: Build binary
+        env:
+          CGO_ENABLED: 0
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          mkdir -p dist
+          VERSION=$(git describe --tags --always)
+          cd service
+          go build -tags "with_gvisor" \
+            -trimpath \
+            -ldflags "-X github.com/v2rayA/v2rayA/conf.Version=${VERSION#v} -s -w" \
+            -o "../dist/v2raya_${GOOS}_${GOARCH}_${VERSION}" .
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2raya_${{ matrix.goos }}_${{ matrix.goarch }}
+          path: dist/v2raya_${{ matrix.goos }}_${{ matrix.goarch }}_*
