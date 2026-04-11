@@ -8,6 +8,7 @@ import (
 	"github.com/daeuniverse/outbound/dialer"
 	"github.com/daeuniverse/outbound/dialer/shadowsocks"
 	"github.com/daeuniverse/outbound/netproxy"
+	"github.com/v2rayA/v2rayA/core/serverObj"
 	"github.com/v2rayA/v2rayA/pkg/plugin"
 	"github.com/v2rayA/v2rayA/pkg/util/log"
 
@@ -25,6 +26,10 @@ func init() {
 }
 
 func NewShadowsocksDialer(s string, d plugin.Dialer) (plugin.Dialer, error) {
+	obj, err := serverObj.ParseSSURL(s)
+	if err == nil && obj.IsShadowsocks2022() {
+		return newShadowsocks2022Dialer(s, d)
+	}
 	dialer, _, err := shadowsocks.NewShadowsocksFromLink(
 		&dialer.ExtraOption{},
 		&plugin.Converter{
