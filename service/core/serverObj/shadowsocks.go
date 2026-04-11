@@ -338,6 +338,10 @@ func (s *Shadowsocks) Configuration(info PriorInfo) (c Configuration, err error)
 	}, nil
 }
 
+func (s *Shadowsocks) IsShadowsocks2022() bool {
+	return strings.HasPrefix(strings.ToLower(s.Cipher), "2022-blake3-")
+}
+
 func (s *Shadowsocks) ExportToURL() string {
 	// sip002
 	u := &url.URL{
